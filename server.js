@@ -29,8 +29,6 @@ async function connectDB() {
     }
 }
 
-connectDB();
-
 // ==========================
 // ROUTES
 // ==========================
@@ -44,6 +42,8 @@ app.get("/", (req, res) => {
 app.get("/add", async (req, res) => {
     const { key, user, days } = req.query;
 
+    if (!db) return res.send("DB NOT READY ❌");
+
     if (key !== ADMIN_KEY) return res.send("NO ACCESS");
     if (!user) return res.send("NO USER");
 
@@ -54,11 +54,15 @@ app.get("/add", async (req, res) => {
         expires: expireDate
     });
 
+    console.log("✅ USER GESPEICHERT:", user);
+
     res.send("USER ADDED");
 });
 
 // CHECK USER
 app.get("/check", async (req, res) => {
+    if (!db) return res.send("DB NOT READY ❌");
+
     const { key } = req.query;
 
     const user = await db.collection("users").findOne({ key });
@@ -72,9 +76,19 @@ app.get("/check", async (req, res) => {
     return res.send("EXPIRED");
 });
 
+// DEBUG (zeigt alle User)
+app.get("/debug", async (req, res) => {
+    if (!db) return res.send("DB NOT READY ❌");
+
+    const users = await db.collection("users").find().toArray();
+    res.json(users);
+});
+
 // ==========================
-// START SERVER
+// START SERVER (WICHTIG FIX)
 // ==========================
-app.listen(PORT, () => {
-    console.log(`🚀 Server läuft auf Port ${PORT}`);
+connectDB().then(() => {
+    app.listen(PORT, () => {
+        console.log(`🚀 Server läuft auf Port ${PORT}`);
+    });
 });
