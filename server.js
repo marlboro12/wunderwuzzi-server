@@ -5,111 +5,133 @@ const app = express();
 app.use(express.json());
 
 // ==========================
-// ⚙️ CONFIG
+// CONFIG
 // ==========================
 const PORT = process.env.PORT || 3000;
-const ADMIN_KEY = "4711"; // <-- ÄNDERN!
+const ADMIN_KEY = "4711";
 
-const MONGO_URI = "mongodb+srv://wunderuser:wunder1234@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority";
+// ⚠️ BESSER: in Render ENV speichern!
+const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://wunderuser:wunder1234@cluster0.plfxa0v.mongodb.net/?retryWrites=true&w=majority";
+
 const client = new MongoClient(MONGO_URI);
 
 let db;
 
 // ==========================
-// 🔌 CONNECT DB
+// DB CONNECT
 // ==========================
 async function connectDB() {
-  await client.connect();
-  db = client.db("wunderwuzzi");
-  console.log("✅ MongoDB connected");
+    try {
+        await client.connect();
+        db = client.db("wunderwuzzi");
+        console.log("✅ MongoDB connected");
+    } catch (err) {
+        console.error("❌ MongoDB Fehler:", err);
+    }
 }
+
 connectDB();
 
 // ==========================
-// 🏠 ROOT
+// ROOT
 // ==========================
 app.get("/", (req, res) => {
-  res.send("🚀 WUNDERWUZZI PRO SERVER LIVE");
+    res.send("🚀 WUNDERWUZZI SERVER LÄUFT");
 });
 
 // ==========================
-// ➕ ADD LICENSE (ADMIN)
+// ADD USER
+// Beispiel:
+// /add?key=4711&user=4711-ULTRA&days=30
 // ==========================
 app.get("/add", async (req, res) => {
-  const { key, admin } = req.query;
+    const { key, user, days } = req.query;
 
-  if (admin !== ADMIN_KEY)
-    return res.status(403).send("NO ADMIN ACCESS");
+    if (key !== ADMIN_KEY) {
+        return res.status(403).send("❌ NO ADMIN");
+    }
 
-  if (!key) return res.send("NO KEY");
+    if (!user) {
+        return res.status(400).send("❌ NO USER");
+    }
 
-  const expires = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 Tage
+    const expireDate = new Date();
+    expireDate.setDate(expireDate.getDate() + (parseInt(days) || 30));
 
-  await db.collection("licenses").updateOne(
-    { key },
-    { $set: { key, expires, hwid: null } },
-    { upsert: true }
-  );
+    try {
+        await db.collection("licenses").updateOne(
+            { user: user },
+            {
+                $set: {
+                    user: user,
+                    expireAt: expireDate,
+                    updatedAt: new Date()
+                }
+            },
+            { upsert: true }
+        );
 
-  res.send("USER ADDED");
+        res.send(`✅ USER ADDED: ${user} | Exp: ${expireDate}`);
+    } catch (err) {
+        res.status(500).send("❌ DB ERROR");
+    }
 });
 
 // ==========================
-// 🔍 CHECK LICENSE
+// CHECK USER
+// Beispiel:
+// /check?key=4711-ULTRA
 // ==========================
 app.get("/check", async (req, res) => {
-  const { key, hwid } = req.query;
+    const { key } = req.query;
 
-  if (!key) return res.send("NO KEY");
+    if (!key) {
+        return res.send("NO USER");
+    }
 
-  const user = await db.collection("licenses").findOne({ key });
+    try {
+        const user = await db.collection("licenses").findOne({ user: key });
 
-  if (!user) return res.send("NO USER");
+        if (!user) {
+            return res.send("NO USER");
+        }
 
-  // Ablauf prüfen
-  if (user.expires < Date.now()) return res.send("EXPIRED");
+        if (new Date(user.expireAt) > new Date()) {
+            return res.send("ACTIVE");
+        } else {
+            return res.send("EXPIRED");
+        }
 
-  // HWID prüfen / setzen
-  if (!user.hwid && hwid) {
-    await db.collection("licenses").updateOne(
-      { key },
-      { $set: { hwid } }
-    );
-  } else if (user.hwid && hwid && user.hwid !== hwid) {
-    return res.send("HWID LOCKED");
-  }
-
-  res.send("ACTIVE");
+    } catch (err) {
+        res.send("ERROR");
+    }
 });
 
 // ==========================
-// ❌ DELETE LICENSE
+// DELETE USER
 // ==========================
 app.get("/delete", async (req, res) => {
-  const { key, admin } = req.query;
+    const { key, user } = req.query;
 
-  if (admin !== ADMIN_KEY)
-    return res.status(403).send("NO ADMIN ACCESS");
+    if (key !== ADMIN_KEY) {
+        return res.status(403).send("NO ADMIN");
+    }
 
-  await db.collection("licenses").deleteOne({ key });
+    if (!user) {
+        return res.send("NO USER");
+    }
 
-  res.send("DELETED");
+    try {
+        await db.collection("licenses").deleteOne({ user: user });
+        res.send("DELETED");
+    } catch (err) {
+        res.send("ERROR");
+    }
 });
 
 // ==========================
-// 📋 LIST ALL (ADMIN)
-// ==========================
-app.get("/list", async (req, res) => {
-  const { admin } = req.query;
-
-  if (admin !== ADMIN_KEY)
-    return res.status(403).send("NO ADMIN ACCESS");
-
-  const users = await db.collection("licenses").find().toArray();
-  res.json(users);
-});
-
+// SERVER START
 // ==========================
 app.listen(PORT, () => {
-  console.log(`🔥 SERVER RUNNING ON PORT ${PORT}`);
+    console.log(`🚀 Server läuft auf Port ${PORT}`);
 });
