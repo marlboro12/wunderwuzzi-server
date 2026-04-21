@@ -10,7 +10,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const ADMIN_KEY = "4711"; // <-- ÄNDERN!
 
-const MONGO_URI = "DEIN_MONGO_LINK_HIER";
+const MONGO_URI = "mongodb+srv://wunderuser:wunder1234@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority";
 const client = new MongoClient(MONGO_URI);
 
 let db;
