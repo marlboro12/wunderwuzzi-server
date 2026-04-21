@@ -1,60 +1,80 @@
 const express = require("express");
 const app = express();
 
+app.use(express.json());
+
+// PORT (Render wichtig!)
 const PORT = process.env.PORT || 3000;
 
-// USERS (im RAM)
-let users = [
-  { key: "4711-ULTRA", active: true }
-];
+// 🔥 SIMPLE MEMORY DB
+let users = {};
 
+// ==========================
 // ROOT
+// ==========================
 app.get("/", (req, res) => {
   res.send("🚀 WUNDERWUZZI SERVER LÄUFT");
 });
 
-// CHECK LICENSE
+// ==========================
+// ADD USER
+// ==========================
+// Beispiel:
+// /add?key=4711-ULTRA
+app.get("/add", (req, res) => {
+  const key = req.query.key;
+
+  if (!key) {
+    return res.send("KEY FEHLT");
+  }
+
+  // 30 Tage gültig
+  const expire = Date.now() + 30 * 24 * 60 * 60 * 1000;
+
+  users[key] = expire;
+
+  console.log("USER ADDED:", key);
+
+  res.send("USER ADDED");
+});
+
+// ==========================
+// CHECK USER
+// ==========================
+// Beispiel:
+// /check?key=4711-ULTRA
 app.get("/check", (req, res) => {
   const key = req.query.key;
 
   console.log("CHECK:", key);
 
-  if (!key) return res.send("NO KEY");
+  if (!key) {
+    return res.send("NO KEY");
+  }
 
-  const user = users.find(u => u.key === key);
+  if (!users[key]) {
+    return res.send("NO USER");
+  }
 
-  if (!user) return res.send("NO USER");
+  if (users[key] < Date.now()) {
+    return res.send("EXPIRED");
+  }
 
-  if (!user.active) return res.send("LICENSE OFF");
-
-  return res.send("OK");
+  return res.send("ACTIVE");
 });
 
-// ADD USER
-app.get("/add", (req, res) => {
-  const key = req.query.key;
-
-  if (!key) return res.send("NO KEY");
-
-  users.push({ key, active: true });
-
-  console.log("ADDED:", key);
-
-  res.send("USER ADDED");
+// ==========================
+// RESET
+// ==========================
+app.get("/reset", (req, res) => {
+  users = {};
+  res.send("RESET DONE");
 });
 
-// REMOVE USER
-app.get("/remove", (req, res) => {
-  const key = req.query.key;
-
-  users = users.filter(u => u.key !== key);
-
-  console.log("REMOVED:", key);
-
-  res.send("USER REMOVED");
-});
-
-// START
+// ==========================
+// START SERVER
+// ==========================
 app.listen(PORT, () => {
-  console.log("🔥 SERVER RUNNING ON PORT", PORT);
+  console.log("🔥 SERVER RUNNING");
+  console.log("PORT:", PORT);
 });
